@@ -1,16 +1,8 @@
 import numpy as np
-from numpy import linalg as LA
-from ase import atoms
-from ase import neighborlist as nl
-from ase import build
-from collections import Counter
-
 import scipy
 from scipy.special import sph_harm
 
-from functions import cart2sph, Gaussian, distance, dis_vector
-
-# radial basis function definitions
+from functions import Gaussian, cart2sph, distance
 
 
 def phi(rcut, r, n):

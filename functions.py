@@ -36,35 +36,19 @@ def sph2cart(rthetarho: List[Coordinate]) -> List[Coordinate]:
     return cart
 
 
-def distance(xyz: Coordinate, xyz1: Coordinate) -> float:
+def distance(a: Coordinate, b: Coordinate) -> float:
     """
     find the distance between 2 vectors
     """
-
-    # takes in two position vectors
-    dx = xyz1[0] - xyz[0]
-    dy = xyz1[1] - xyz[1]
-    dz = xyz1[2] - xyz[2]
-    distance = (dx**2+dy**2+dz**2)**0.5
-    return distance
+    return np.linalg.norm(a - b) # better to use this than roll own version
 
 
-def dis_vector(xyz: Coordinate, xyz1: Coordinate) -> Coordinate:
-    # takes in two position vectors
-    x = xyz1[0] - xyz[0]
-    y = xyz1[1] - xyz[1]
-    z = xyz1[2] - xyz[2]
-    return np.array([x, y, z])
-
-
-# Gaussian fucntion
 def Gaussian(r:float, ri:float, alpha:float) -> float:
     """
     get the value of the gaussian function at r 
     with center ri and lengthscale alpha
     """
-    gaussian = np.exp(-alpha*distance(ri, r)**2)
-    return gaussian
+    return np.exp(-alpha*distance(ri, r)**2)
 
 
  

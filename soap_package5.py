@@ -81,7 +81,7 @@ def soap_desc(
             y = coord[j]
             for k in range(n_r):
                 z = coord[k]
-                if distance([x, y, z], [0, 0, 0]) <= rcut:
+                if distance(np.array([x, y, z]), np.array([0, 0, 0])) <= rcut:
                     r_cart.append(np.array([x, y, z]))
 
     r_sph = cart2sph(r_cart)

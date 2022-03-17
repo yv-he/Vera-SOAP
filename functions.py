@@ -1,10 +1,13 @@
+from typing import List
 import numpy as np
+from nptyping import NDArray
 
-# converting between cartesian and spherical coord
-# converting an array of coords
+Coordinate = NDArray[(3,), float]
 
-
-def cart2sph(xyz):
+def cart2sph(xyz: List[Coordinate]) -> List[Coordinate]:
+    """
+    converts a list of cartesian coordinates to spherical
+    """
     sph = []
     for i in range(len(xyz)):
         coord = xyz[i]
@@ -17,7 +20,10 @@ def cart2sph(xyz):
     return sph
 
 
-def sph2cart(rthetarho):
+def sph2cart(rthetarho: List[Coordinate]) -> List[Coordinate]:
+    """
+    converts a list of spherical coordinates to spherical
+    """
     cart = []
     for i in range(len(rthetarho)):
         coord = rthetarho[i]
@@ -29,21 +35,12 @@ def sph2cart(rthetarho):
         cart.append(np.array([x, y, z]))
     return cart
 
-# converting single coord
 
+def distance(xyz: Coordinate, xyz1: Coordinate) -> float:
+    """
+    find the distance between 2 vectors
+    """
 
-def as_sph(xyz):
-    x2y2 = xyz[0]**2 + xyz[1]**2
-    r = np.sqrt(x2y2 + xyz[2]**2)
-    theta = np.arctan2(np.sqrt(x2y2), xyz[2])
-    rho = np.arctan2(xyz[1], xyz[0])
-    return np.array([r, theta, rho])
-    # definition for calculating norm of a vector
-
-# definition for distance and distance vector
-
-
-def distance(xyz, xyz1):
     # takes in two position vectors
     dx = xyz1[0] - xyz[0]
     dy = xyz1[1] - xyz[1]
@@ -52,7 +49,7 @@ def distance(xyz, xyz1):
     return distance
 
 
-def dis_vector(xyz, xyz1):
+def dis_vector(xyz: Coordinate, xyz1: Coordinate) -> Coordinate:
     # takes in two position vectors
     x = xyz1[0] - xyz[0]
     y = xyz1[1] - xyz[1]
@@ -60,19 +57,14 @@ def dis_vector(xyz, xyz1):
     return np.array([x, y, z])
 
 
-# def distance(a, b):
-#     return a - b
-
-
 # Gaussian fucntion
-def Gaussian(r, ri, alpha):
+def Gaussian(r:float, ri:float, alpha:float) -> float:
+    """
+    get the value of the gaussian function at r 
+    with center ri and lengthscale alpha
+    """
     gaussian = np.exp(-alpha*distance(ri, r)**2)
     return gaussian
 
-# polynomial radial functions
 
-
-def phi(rcut, r, n):
-    N = np.sqrt(rcut**(2*n+5)/(2*n+5))  # normalisation
-    phi = ((rcut-r)**(n+2))/N
-    return phi
+ 

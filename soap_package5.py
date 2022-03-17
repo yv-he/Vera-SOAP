@@ -1,17 +1,27 @@
+from typing import Any, List
+from ase import Atoms
+
 import numpy as np
 import scipy
+from nptyping import NDArray
 from scipy.special import sph_harm
 
 from functions import Gaussian, cart2sph, distance
 
+OneDArray = NDArray[(Any,), float]
 
-def phi(rcut, r, n):
+
+def phi(rcut: float, r: float, n: int) -> float:
+    """
+    value of radial basis function at r, paramterised by n and r_cut
+    """
+
     N = np.sqrt(rcut**(2*n+5)/(2*n+5))
     phi = ((rcut-r)**(n+2))/N
     return phi
 
 
-def g(rcut, n_max, r):
+def g(rcut: float, n_max: int, r: float) -> OneDArray:
     n = np.arange(1, n_max+1)
     # matrix containing overlap integrals of n and n'
     S = np.empty([n_max, n_max])
@@ -23,7 +33,7 @@ def g(rcut, n_max, r):
             S[i][j] = s
     S_inv = np.linalg.inv(S)
     W = scipy.linalg.sqrtm(S_inv)  # W matrix
-    Phi = []
+    Phi: List[float] = []
     for i in range(len(n)):
         Phi.append(phi(rcut, r, n[i]))
     g = np.empty(n_max)
@@ -37,7 +47,7 @@ def g(rcut, n_max, r):
 # spherical harmonics
 
 
-def Y(r, l_max):
+def Y(r: float, l_max: int) -> NDArray[OneDArray]:
     l = np.arange(0, l_max+1)  # l=0,1,...l_max
     Y = np.empty(len(l), dtype="object")
     for i in range(len(l)):
@@ -50,7 +60,9 @@ def Y(r, l_max):
     return Y
 
 
-def soap_desc(atoms, rcut, l_max, n_max, atom_sigma):
+def soap_desc(
+    atoms: Atoms, rcut: float, l_max: int, n_max: int, atom_sigma: float
+) -> NDArray[OneDArray]:
     n_atom = len(atoms)
     a = 1/(atom_sigma**2)  # alpha
     # padding = atom_sigma*np.sqrt(-2*np.log(0.001)) #cutoff padding

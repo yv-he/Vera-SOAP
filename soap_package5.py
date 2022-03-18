@@ -1,9 +1,9 @@
-from itertools import product
-from typing import Any, List
+from typing import Any
 
 import numpy as np
 import scipy
 from ase import Atoms
+from ase.neighborlist import neighbor_list
 from nptyping import NDArray
 from scipy.special import sph_harm
 
@@ -13,7 +13,6 @@ from sphere_sampling import cartesian_product, sample_sphere_random
 OneDArray = NDArray[(Any,), float]
 TwoDArray = NDArray[(Any, Any), float]
 Coordinates = NDArray[(Any, 3), float]
-random = np.random.RandomState(seed=42).random
 
 
 def phi(rcut: float, r: float, n: int) -> float:
@@ -80,36 +79,39 @@ def soap_desc(
     generate soap descriptors for atoms, parameterised by the hypers
     """
 
+    n_sample = 1000
     n_atom = len(atoms)
-    alpha = 1/(atom_sigma**2)
 
     sphere_volume = 4/3*np.pi*rcut**3  # volume of the sphere
 
-    r_cart, r_sph = sample_sphere_random(N=1000, r=rcut)
+    r_cart, r_sph = sample_sphere_random(N=n_sample, r=rcut)
 
-    Gn = np.empty(len(r_sph), dtype="object")  # raidal basis function
-    for i in range(len(r_sph)):
-        Gn[i] = g(rcut, n_max, r_sph[i][0])
+    Gn = np.array([g(rcut, n_max, r)
+                  for r in r_sph[:, 0]])  # radial basis functions
 
-    Ylm = np.empty(len(r_sph), dtype="object")  # spherical harmonics
-    for i in range(len(r_sph)):
+    Ylm = np.empty(n_sample, dtype="object")  # spherical harmonics
+    for i in range(n_sample):
         Ylm[i] = Y(r_sph[i], l_max)
 
-    P = np.empty(n_atom, dtype="object")
+    descriptor = np.empty(n_atom, dtype="object")
+
+    # see https://wiki.fysik.dtu.dk/ase/ase/neighborlist.html
+    _atoms, vectors = neighbor_list(
+        "iD", atoms, cutoff=rcut, self_interaction=True
+    )
+
     for f in range(n_atom):
+        neighbours = vectors[_atoms == f]
 
-        # calculating the distance between central atom and all other atoms with pbc
-        d = atoms.get_distances(np.arange(n_atom), f)
-        D = atoms.get_distances(np.arange(n_atom), f,
-                                vector=True)  # distance vectors
-        Di = D[np.where(d < rcut)]  # distance vectors with a cutoff distance
-
-        atom_neigh_den = np.empty(len(r_cart))  # atomic neighbour density
-        for i in range(len(r_cart)):
-            gaussian = []
-            for j in range(len(Di)):
-                gaussian.append(Gaussian(r_cart[i], Di[j], alpha))  # r-ri
-            atom_neigh_den[i] = np.sum(gaussian)
+        # atomic neighbourhood density for atom f
+        # at each point sampled in the sphere
+        atom_neigh_den = np.empty(n_sample)
+        for idx in range(n_sample):
+            gaussians = [
+                Gaussian(r_cart[idx], center=neighbour, sigma=atom_sigma)
+                for neighbour in neighbours
+            ]
+            atom_neigh_den[idx] = np.sum(gaussians)
 
         # extracting coefficients
         c_nlm = np.empty((n_max, l_max+1), dtype="object")
@@ -136,6 +138,6 @@ def soap_desc(
         p = np.array(p)
         p1 = p / np.linalg.norm(p)
 
-        P[f] = p1
+        descriptor[f] = p1
 
-    return P
+    return descriptor

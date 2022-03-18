@@ -1,14 +1,17 @@
-from typing import Any, List
-from ase import Atoms
+from typing import Any, List, Tuple
 
 import numpy as np
 import scipy
+from ase import Atoms
 from nptyping import NDArray
 from scipy.special import sph_harm
 
 from functions import Gaussian, cart2sph, distance
+from sphere_sampling import sample_unit_sphere_random
 
 OneDArray = NDArray[(Any,), float]
+Coordinates = NDArray[(Any, 3), float]
+random = np.random.RandomState(seed=42).random
 
 
 def phi(rcut: float, r: float, n: int) -> float:
@@ -63,43 +66,31 @@ def Y(r: float, l_max: int) -> NDArray[OneDArray]:
 def soap_desc(
     atoms: Atoms, rcut: float, l_max: int, n_max: int, atom_sigma: float
 ) -> NDArray[OneDArray]:
+    """
+    generate soap descriptors for atoms, parameterised by the hypers
+    """
+
     n_atom = len(atoms)
-    a = 1/(atom_sigma**2)  # alpha
-    # padding = atom_sigma*np.sqrt(-2*np.log(0.001)) #cutoff padding
-    atom_pos = atoms.get_positions()  # postitions of atoms in the system
-    atom_pos_sph = cart2sph(atom_pos)  # in spherical
-    dr = 0.5
-    n_r = int(2*rcut/dr)  # number of r points = n_r**3
+    alpha = 1/(atom_sigma**2)
+
     v = 4/3*np.pi*rcut**3  # volume of the sphere
 
     # sampling r points in a sphere
-    r_cart = []
-    coord = np.linspace(-rcut, rcut, n_r)
-    for i in range(n_r):
-        x = coord[i]
-        for j in range(n_r):
-            y = coord[j]
-            for k in range(n_r):
-                z = coord[k]
-                if distance(np.array([x, y, z]), np.array([0, 0, 0])) <= rcut:
-                    r_cart.append(np.array([x, y, z]))
-
-    r_sph = cart2sph(r_cart)
+    r_cart, r_sph = sample_unit_sphere_random(N=1000)
+    r_cart *= rcut
+    r_sph[:, 0] *= rcut
 
     Gn = np.empty(len(r_sph), dtype="object")  # raidal basis function
     for i in range(len(r_sph)):
         Gn[i] = g(rcut, n_max, r_sph[i][0])
-        # Gn = [[g1(r1),g2(r1)],[g1(r2),g2(r2)],[g1(r3),g2(r3)]...]
 
     Ylm = np.empty(len(r_sph), dtype="object")  # spherical harmonics
     for i in range(len(r_sph)):
         Ylm[i] = Y(r_sph[i], l_max)
-        #Ylm = [[[Y00(r1)],[Y1-1(r1),Y10(r1),Y11(r1)],...],[[Y00(r2)],[Y1-1(r2),Y10(r2),Y11(r2)],...],...]
 
     P = np.empty(n_atom, dtype="object")
     for f in range(n_atom):
-        # c_atom = atom_pos[f] #position of the central atom in cartesian
-        #new_pos = atom_pos - c_atom
+
         # calculating the distance between central atom and all other atoms with pbc
         d = atoms.get_distances(np.arange(n_atom), f)
         D = atoms.get_distances(np.arange(n_atom), f,
@@ -110,7 +101,7 @@ def soap_desc(
         for i in range(len(r_cart)):
             gaussian = []
             for j in range(len(Di)):
-                gaussian.append(Gaussian(r_cart[i], Di[j], a))  # r-ri
+                gaussian.append(Gaussian(r_cart[i], Di[j], alpha))  # r-ri
             atom_neigh_den[i] = np.sum(gaussian)
 
         # extracting coefficients

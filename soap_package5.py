@@ -72,6 +72,26 @@ def Y(r: float, l_max: int) -> NDArray[OneDArray]:
     return Y
 
 
+def atomic_neighbour_density(
+    atom_locations: Coordinates, sample_points: Coordinates, atom_sigma: float
+) -> OneDArray:
+    """
+    calculate the atomic neighbour density at all `sample_points` 
+    based on atoms at `atom_locations` and parameterised by `atom_sigma`
+    """
+
+    n_sample = len(sample_points)
+    atom_neigh_den = np.empty(n_sample)
+    for idx in range(n_sample):
+        gaussians = [
+            Gaussian(sample_points[idx], center=atom, sigma=atom_sigma)
+            for atom in atom_locations
+        ]
+        atom_neigh_den[idx] = np.sum(gaussians)
+
+    return atom_neigh_den
+
+
 def soap_desc(
     atoms: Atoms, rcut: float, l_max: int, n_max: int, atom_sigma: float
 ) -> NDArray[OneDArray]:
@@ -86,32 +106,24 @@ def soap_desc(
 
     r_cart, r_sph = sample_sphere_random(N=n_sample, r=rcut)
 
-    Gn = np.array([g(rcut, n_max, r)
-                  for r in r_sph[:, 0]])  # radial basis functions
+    # radial basis functions
+    Gn = np.array([g(rcut, n_max, r) for r in r_sph[:, 0]])
 
-    Ylm = np.empty(n_sample, dtype="object")  # spherical harmonics
-    for i in range(n_sample):
-        Ylm[i] = Y(r_sph[i], l_max)
-
-    descriptor = np.empty(n_atom, dtype="object")
+    # spherical harmonics
+    Ylm = [Y(sphr_coord, l_max) for sphr_coord in r_sph]
 
     # see https://wiki.fysik.dtu.dk/ase/ase/neighborlist.html
     _atoms, vectors = neighbor_list(
         "iD", atoms, cutoff=rcut, self_interaction=True
     )
 
+    descriptor = np.empty(n_atom, dtype="object")
     for f in range(n_atom):
         neighbours = vectors[_atoms == f]
 
         # atomic neighbourhood density for atom f
         # at each point sampled in the sphere
-        atom_neigh_den = np.empty(n_sample)
-        for idx in range(n_sample):
-            gaussians = [
-                Gaussian(r_cart[idx], center=neighbour, sigma=atom_sigma)
-                for neighbour in neighbours
-            ]
-            atom_neigh_den[idx] = np.sum(gaussians)
+        neigh_den = atomic_neighbour_density(neighbours, r_cart, atom_sigma)
 
         # extracting coefficients
         c_nlm = np.empty((n_max, l_max+1), dtype="object")
@@ -121,7 +133,7 @@ def soap_desc(
                 for k in range(2*j+1):
                     c_nl = []
                     for z in range(len(r_sph)):
-                        c_nl.append(Gn[z][i]*Ylm[z][j][k]*atom_neigh_den[z])
+                        c_nl.append(Gn[z][i]*Ylm[z][j][k]*neigh_den[z])
                     c_n.append((1/sphere_volume)*sum(c_nl))
                 c_nlm[i][j] = np.array(c_n)
 

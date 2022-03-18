@@ -1,6 +1,6 @@
 import numpy as np
 from ase.lattice.cubic import Diamond
-from soap_package5 import overlaps, overlaps_old, soap_desc
+from soap_package5 import atomic_neighbour_density, overlaps, overlaps_old, soap_desc
 from sphere_sampling import cart2sphr, sample_unit_sphere_random, sample_unit_sphere_uniform, sphr2cart
 
 
@@ -32,6 +32,15 @@ def test_overlaps():
     S_new = overlaps(n_max)
 
     assert (S_old == S_new).all(), "Incorrect implementation"
+
+
+def test_neighbour_density():
+    atoms = np.array([[0, 0, 0]])
+    points = np.array([[0, 0, 0]])
+    sigma = 0.5
+
+    a_n_d = atomic_neighbour_density(atoms, points, sigma)
+    assert a_n_d[0] == 1, "A.N.D. for single point and atom should be 1"
 
 
 def test_soap():

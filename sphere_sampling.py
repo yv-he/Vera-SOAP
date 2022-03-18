@@ -50,7 +50,7 @@ def sphr2cart(sphr: Coordinates) -> Coordinates:
     return np.array([x, y, z]).T
 
 
-def sample_unit_sphere_random(N) -> Tuple[Coordinates, Coordinates]:
+def sample_unit_sphere_random(N: int) -> Tuple[Coordinates, Coordinates]:
     """
     generate N random points within the unit sphere
     """
@@ -67,7 +67,7 @@ def sample_unit_sphere_random(N) -> Tuple[Coordinates, Coordinates]:
     return sphr2cart(sphr), sphr
 
 
-def sample_unit_sphere_uniform(N) -> Tuple[Coordinates, Coordinates]:
+def sample_unit_sphere_uniform(N: int) -> Tuple[Coordinates, Coordinates]:
     """
     generate roughly N points with uniform spacing inside the unit sphere
     """
@@ -81,6 +81,20 @@ def sample_unit_sphere_uniform(N) -> Tuple[Coordinates, Coordinates]:
 
     cart = grid_3d[np.linalg.norm(grid_3d, axis=1) <= 1]
     return cart, cart2sphr(cart)
+
+
+def sample_sphere_uniform(N: int, r: float) -> Tuple[Coordinates, Coordinates]:
+    cart, sphr = sample_unit_sphere_uniform(N)
+    cart *= r
+    sphr[:, 0] *= r
+    return cart, sphr
+
+
+def sample_sphere_random(N: int, r: float) -> Tuple[Coordinates, Coordinates]:
+    cart, sphr = sample_unit_sphere_random(N)
+    cart *= r
+    sphr[:, 0] *= r
+    return cart, sphr
 
 
 def cartesian_product(*arrays):

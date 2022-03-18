@@ -1,4 +1,6 @@
 import numpy as np
+from ase.lattice.cubic import Diamond
+from soap_package5 import overlaps, overlaps_old, soap_desc
 from sphere_sampling import cart2sphr, sample_unit_sphere_random, sample_unit_sphere_uniform, sphr2cart
 
 
@@ -24,7 +26,24 @@ def test_conversions():
     assert np.isclose(cart, cart_).all(), "Conversions Are Not Accurate"
 
 
+def test_overlaps():
+    n_max = 8
+    S_old = overlaps_old(n_max)
+    S_new = overlaps(n_max)
+
+    assert (S_old == S_new).all(), "Incorrect implementation"
+
+
+def test_soap():
+    atoms = Diamond("C")
+    atoms.set_pbc([False, False, False])
+
+    soap_desc(atoms, rcut=3.7, l_max=1, n_max=4, atom_sigma=0.5)
+
+
 if __name__ == "__main__":
     test_sphere_sampling()
     test_conversions()
+    test_overlaps()
+    test_soap()
     print("Success - all tests pass")

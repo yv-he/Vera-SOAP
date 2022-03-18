@@ -1,4 +1,5 @@
-from typing import Any, List, Tuple
+from itertools import product
+from typing import Any, List
 
 import numpy as np
 import scipy
@@ -6,10 +7,11 @@ from ase import Atoms
 from nptyping import NDArray
 from scipy.special import sph_harm
 
-from functions import Gaussian, cart2sph, distance
-from sphere_sampling import sample_unit_sphere_random
+from functions import Gaussian
+from sphere_sampling import cartesian_product, sample_sphere_random
 
 OneDArray = NDArray[(Any,), float]
+TwoDArray = NDArray[(Any, Any), float]
 Coordinates = NDArray[(Any, 3), float]
 random = np.random.RandomState(seed=42).random
 
@@ -24,9 +26,19 @@ def phi(rcut: float, r: float, n: int) -> float:
     return phi
 
 
-def g(rcut: float, n_max: int, r: float) -> OneDArray:
+def overlaps(n_max: int) -> TwoDArray:
+    """
+    generate the matrix S of overlaps
+    """
+    ns = np.arange(n_max) + 1  # i.e. [1, 2, 3, ..., n_max]
+
+    a, b = cartesian_product(ns, ns).T
+    S = np.sqrt((2*a+5) * (2*b+5)) / (5+a+b)
+    return S.reshape(n_max, n_max)
+
+
+def overlaps_old(n_max: int) -> TwoDArray:
     n = np.arange(1, n_max+1)
-    # matrix containing overlap integrals of n and n'
     S = np.empty([n_max, n_max])
     for i in range(len(n)):
         a = n[i]  # alpha
@@ -34,20 +46,18 @@ def g(rcut: float, n_max: int, r: float) -> OneDArray:
             b = n[j]  # beta
             s = np.sqrt((2*a+5)*(2*b+5))/(5+a+b)  # overlap integral
             S[i][j] = s
-    S_inv = np.linalg.inv(S)
-    W = scipy.linalg.sqrtm(S_inv)  # W matrix
-    Phi: List[float] = []
-    for i in range(len(n)):
-        Phi.append(phi(rcut, r, n[i]))
-    g = np.empty(n_max)
-    for i in range(n_max):
-        gn = []
-        for j in range(n_max):
-            gn.append(W[j][i]*Phi[j])
-        g[i] = np.sum(gn)
-    return g
+    return S
 
-# spherical harmonics
+
+def g(rcut: float, n_max: int, r: float) -> OneDArray:
+    overlap_matrix = overlaps(n_max)
+    S_inv = np.linalg.inv(overlap_matrix)
+    W = scipy.linalg.sqrtm(S_inv)
+
+    ns = np.arange(n_max) + 1
+    Phi = np.array([phi(rcut, r, n) for n in ns])
+
+    return (W * Phi).sum(axis=1)
 
 
 def Y(r: float, l_max: int) -> NDArray[OneDArray]:
@@ -73,12 +83,9 @@ def soap_desc(
     n_atom = len(atoms)
     alpha = 1/(atom_sigma**2)
 
-    v = 4/3*np.pi*rcut**3  # volume of the sphere
+    sphere_volume = 4/3*np.pi*rcut**3  # volume of the sphere
 
-    # sampling r points in a sphere
-    r_cart, r_sph = sample_unit_sphere_random(N=1000)
-    r_cart *= rcut
-    r_sph[:, 0] *= rcut
+    r_cart, r_sph = sample_sphere_random(N=1000, r=rcut)
 
     Gn = np.empty(len(r_sph), dtype="object")  # raidal basis function
     for i in range(len(r_sph)):
@@ -113,7 +120,7 @@ def soap_desc(
                     c_nl = []
                     for z in range(len(r_sph)):
                         c_nl.append(Gn[z][i]*Ylm[z][j][k]*atom_neigh_den[z])
-                    c_n.append((1/v)*sum(c_nl))
+                    c_n.append((1/sphere_volume)*sum(c_nl))
                 c_nlm[i][j] = np.array(c_n)
 
         c_nlm_conj = np.conj(c_nlm)  # complex conjugate of the coefficients

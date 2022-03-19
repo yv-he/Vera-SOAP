@@ -13,6 +13,10 @@ from sphere_sampling import cartesian_product, sample_sphere_random
 OneDArray = NDArray[(Any,), float]
 TwoDArray = NDArray[(Any, Any), float]
 Coordinates = NDArray[(Any, 3), float]
+Coordinate = NDArray[(3), float]
+
+
+N_SAMPLE = 1000  # number of points to sample for the atomic neighbour density
 
 
 def phi(rcut: float, r: float, n: int) -> float:
@@ -48,18 +52,38 @@ def overlaps_old(n_max: int) -> TwoDArray:
     return S
 
 
-def g(rcut: float, n_max: int, r: float) -> OneDArray:
+def expand_in_rbfs(rcut: float, n_max: int, r: float) -> OneDArray:
+    """
+    expand the distance r in the radial basis functions 
+    parameterised by rcut and n_max
+    """
+
+    # TODO this entire block is independent of r:
+    # restructure your code so that this only needs to be calculated once
+    ##################################
     overlap_matrix = overlaps(n_max)
     S_inv = np.linalg.inv(overlap_matrix)
     W = scipy.linalg.sqrtm(S_inv)
+    ##################################
 
     ns = np.arange(n_max) + 1
     Phi = np.array([phi(rcut, r, n) for n in ns])
 
+    # this can be generalised so that you pass in all the relevant
+    # distances (rs) at once and then perform this vectorised calc.
+    # this will make code much faster!
     return (W * Phi).sum(axis=1)
 
 
-def Y(r: float, l_max: int) -> NDArray[OneDArray]:
+def expand_in_spherical_harmonics(
+    sphr_coord: Coordinate, l_max: int
+) -> NDArray[OneDArray]:
+    """
+    expand the (spherical) coordinate in spherical harmonics up to l=`l_max`
+    """
+
+    r, polar, azimuthal = sphr_coord
+
     l = np.arange(0, l_max+1)  # l=0,1,...l_max
     Y = np.empty(len(l), dtype="object")
     for i in range(len(l)):
@@ -67,8 +91,11 @@ def Y(r: float, l_max: int) -> NDArray[OneDArray]:
         li = l[i]  # l=0,1,...l_max
         m = np.arange(-li, li+1)  # m = -l,-l+1,..0,..,l
         for j in range(2*i+1):
-            y.append(sph_harm(m[j], li, r[2], r[1]))
+            y.append(sph_harm(m[j], li, azimuthal, polar))
         Y[i] = np.array(y)
+
+    # Y is of shape: [[1], [3], [5], [...], [2*l_max+1]]
+    # In general want to avoid irregularly shaped arrs like this at all costs.
     return Y
 
 
@@ -99,18 +126,20 @@ def soap_desc(
     generate soap descriptors for atoms, parameterised by the hypers
     """
 
-    n_sample = 1000
     n_atom = len(atoms)
 
     sphere_volume = 4/3*np.pi*rcut**3  # volume of the sphere
 
-    r_cart, r_sph = sample_sphere_random(N=n_sample, r=rcut)
+    r_cart, r_sph = sample_sphere_random(N=N_SAMPLE, r=rcut)
 
-    # radial basis functions
-    Gn = np.array([g(rcut, n_max, r) for r in r_sph[:, 0]])
+    # positions of sampled points expanded in radial basis functions
+    Gn = np.array([expand_in_rbfs(rcut, n_max, r) for r in r_sph[:, 0]])
 
-    # spherical harmonics
-    Ylm = [Y(sphr_coord, l_max) for sphr_coord in r_sph]
+    # positions of sampled points expanded as spherical harmonics
+    Ylm = [
+        expand_in_spherical_harmonics(sphr_coord, l_max)
+        for sphr_coord in r_sph
+    ]
 
     # see https://wiki.fysik.dtu.dk/ase/ase/neighborlist.html
     _atoms, vectors = neighbor_list(
@@ -121,8 +150,8 @@ def soap_desc(
     for f in range(n_atom):
         neighbours = vectors[_atoms == f]
 
-        # atomic neighbourhood density for atom f
-        # at each point sampled in the sphere
+        # atomic neighbourhood density for atom f evaluated
+        # at each point sampled in the sphere with radius rcut
         neigh_den = atomic_neighbour_density(neighbours, r_cart, atom_sigma)
 
         # extracting coefficients
@@ -152,4 +181,4 @@ def soap_desc(
 
         descriptor[f] = p1
 
-    return descriptor
+    return np.array(descriptor)

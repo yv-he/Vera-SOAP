@@ -3,16 +3,15 @@ from typing import Any
 import numpy as np
 import scipy
 from ase import Atoms
-from ase.neighborlist import neighbor_list
 from nptyping import NDArray
 from scipy.special import sph_harm
 
 from functions import Gaussian
-from sphere_sampling import cartesian_product, sample_sphere_random
+from neighbours import neighbours_within_cutoff
+from sphere_sampling import cartesian_product, sample_sphere_random, Coordinates
 
 OneDArray = NDArray[(Any,), float]
 TwoDArray = NDArray[(Any, Any), float]
-Coordinates = NDArray[(Any, 3), float]
 Coordinate = NDArray[(3), float]
 
 
@@ -141,18 +140,17 @@ def soap_desc(
         for sphr_coord in r_sph
     ]
 
-    # see https://wiki.fysik.dtu.dk/ase/ase/neighborlist.html
-    _atoms, vectors = neighbor_list(
-        "iD", atoms, cutoff=rcut, self_interaction=True
-    )
+    vectors_to_neighbours_for_ = neighbours_within_cutoff(atoms, cutoff=5)
 
     descriptor = np.empty(n_atom, dtype="object")
-    for f in range(n_atom):
-        neighbours = vectors[_atoms == f]
+    for atom_idx in range(n_atom):
+        neighbour_vecs = vectors_to_neighbours_for_[atom_idx]
 
-        # atomic neighbourhood density for atom f evaluated
+        # atomic neighbourhood density for atom `atom_idx` evaluated
         # at each point sampled in the sphere with radius rcut
-        neigh_den = atomic_neighbour_density(neighbours, r_cart, atom_sigma)
+        neigh_den = atomic_neighbour_density(
+            neighbour_vecs, r_cart, atom_sigma
+        )
 
         # extracting coefficients
         c_nlm = np.empty((n_max, l_max+1), dtype="object")
@@ -179,6 +177,6 @@ def soap_desc(
         p = np.array(p)
         p1 = p / np.linalg.norm(p)
 
-        descriptor[f] = p1
+        descriptor[atom_idx] = p1
 
     return np.array(descriptor)

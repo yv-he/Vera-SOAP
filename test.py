@@ -46,7 +46,6 @@ def test_neighbour_density():
 def test_soap():
     atoms = Diamond("C")
     atoms.set_pbc([False, False, False])
-
     soap_desc(atoms, rcut=3.7, l_max=1, n_max=4, atom_sigma=0.5)
 
 

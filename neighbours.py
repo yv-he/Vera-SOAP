@@ -5,8 +5,8 @@ from ase.neighborlist import neighbor_list
 from sphere_sampling import Coordinates
 
 
-def neighbours_within_cutoff(
-    atoms: Atom, cutoff: float, self_interaction: bool = True
+def local_atomic_environments(
+    atoms: Atom, cutoff: float, include_central_atom: bool = True
 ) -> List[Coordinates]:
     """
     get a list of the vectors to each neighbour for each atom in atoms
@@ -28,6 +28,6 @@ def neighbours_within_cutoff(
     """
 
     atom_idxs, vectors = neighbor_list(
-        "iD", atoms, cutoff=cutoff, self_interaction=self_interaction
+        "iD", atoms, cutoff=cutoff, self_interaction=include_central_atom
     )
     return [vectors[atom_idxs == i] for i in range(len(atoms))]

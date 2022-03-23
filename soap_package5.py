@@ -7,7 +7,7 @@ from nptyping import NDArray
 from scipy.special import sph_harm
 
 from functions import Gaussian
-from neighbours import neighbours_within_cutoff
+from neighbours import local_atomic_environments
 from sphere_sampling import cartesian_product, sample_sphere_random, Coordinates
 
 OneDArray = NDArray[(Any,), float]
@@ -125,10 +125,6 @@ def soap_desc(
     generate soap descriptors for atoms, parameterised by the hypers
     """
 
-    n_atom = len(atoms)
-
-    sphere_volume = 4/3*np.pi*rcut**3  # volume of the sphere
-
     r_cart, r_sph = sample_sphere_random(N=N_SAMPLE, r=rcut)
 
     # positions of sampled points expanded in radial basis functions
@@ -140,16 +136,21 @@ def soap_desc(
         for sphr_coord in r_sph
     ]
 
-    vectors_to_neighbours_for_ = neighbours_within_cutoff(atoms, cutoff=5)
+    environments = local_atomic_environments(
+        atoms, cutoff=5, include_central_atom=True
+    )
 
-    descriptor = np.empty(n_atom, dtype="object")
-    for atom_idx in range(n_atom):
-        neighbour_vecs = vectors_to_neighbours_for_[atom_idx]
+    def describe_with_soap(atomic_enviroment: Coordinates):
+        """
+        generate single soap vector for a given atomic_enviroment
+        """
+
+        sphere_volume = 4/3*np.pi*rcut**3
 
         # atomic neighbourhood density for atom `atom_idx` evaluated
         # at each point sampled in the sphere with radius rcut
         neigh_den = atomic_neighbour_density(
-            neighbour_vecs, r_cart, atom_sigma
+            atomic_enviroment, r_cart, atom_sigma
         )
 
         # extracting coefficients
@@ -177,6 +178,6 @@ def soap_desc(
         p = np.array(p)
         p1 = p / np.linalg.norm(p)
 
-        descriptor[atom_idx] = p1
+        return p1
 
-    return np.array(descriptor)
+    return np.array([describe_with_soap(env) for env in environments])
